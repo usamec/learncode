@@ -28,6 +28,7 @@ function Compiler(filename, st, flags, sourceCodeForAnnotation)
     this.allUnits = [];
 
     this.source = sourceCodeForAnnotation ? sourceCodeForAnnotation.split("\n") : false;
+    this.changedVars = [];
 }
 
 /**
@@ -98,8 +99,36 @@ Compiler.prototype.annotateSource = function(ast)
 
 		out("\nSk.currLineNo = ",lineno, ";\nSk.currColNo = ",col_offset,"\n\n");	//	Added by RNL
 		out("\nSk.currFilename = '",this.filename,"';\n\n");	//	Added by RNL
+        out("\nif (Sk.line_log === undefined) Sk.line_log = [];");
+        var localsarr2 = [];
+        var localsarr = this.getLocals(this.u);
+        for (var l in localsarr) {
+          localsarr2.push(localsarr[l]+":"+localsarr[l]);
+        }
+        out("\nSk.line_log.push({lineno:Sk.currLineNo, loc:Sk.copyLoc($loc), \
+text_out:Sk.outtext,locx:Sk.copyLoc({"+localsarr2.join(',')+"})});\n");
+        out("\n/*locals: "+this.getLocals(this.u).join(',')+"*/\n");
     }
 };
+
+Compiler.prototype.addChanged = function(ast) {
+    if (this.source) {
+        var changedVars2 = [];
+        var have = {}
+        for (var ch in this.changedVars) {
+          var chn = this.changedVars[ch].replace(".", "$$");
+          if (have[chn] === undefined) {
+            changedVars2.push(chn+":"+this.changedVars[ch]);
+            have[chn] = true;
+          }
+        }
+
+        if (changedVars2.length > 0) {
+          out("\nSk.line_log[Sk.line_log.length-1].changed = Sk.copyLoc({"+changedVars2.join(',')+"});\n");
+        }
+        this.changedVars = [];
+    }
+}
 
 Compiler.prototype.gensym = function(hint)
 {
@@ -736,6 +765,25 @@ Compiler.prototype.outputLocals = function(unit)
     return "";
 };
 
+Compiler.prototype.getLocals = function(unit) {
+    var have = {};
+    //print("args", unit.name.v, JSON.stringify(unit.argnames));
+    for (var i = 0; unit.argnames && i < unit.argnames.length; ++i)
+        have[unit.argnames[i]] = true;
+    unit.localnames.sort();
+    var output = [];
+    for (var i = 0; i < unit.localnames.length; ++i)
+    {
+        var name = unit.localnames[i];
+        if (have[name] === undefined)
+        {
+            output.push(name);
+            have[name] = true;
+        }
+    }
+    return output;
+};
+
 Compiler.prototype.outputAllUnits = function()
 {
     var ret = '';
@@ -809,6 +857,7 @@ Compiler.prototype.cwhile = function(s)
         var orelse = s.orelse.length > 0 ? this.newBlock('while orelse') : null;
         var body = this.newBlock('while body');
 
+        this.annotateSource(s);
         this._jumpfalse(this.vexpr(s.test), orelse ? orelse : next);
         this._jump(body);
 
@@ -1588,6 +1637,7 @@ Compiler.prototype.vstmt = function(s)
         default:
             goog.asserts.fail("unhandled case in vstmt");
     }
+//    this.addChanged(s);
 };
 
 Compiler.prototype.vseqstmt = function(stmts)
@@ -1687,6 +1737,7 @@ Compiler.prototype.nameop = function(name, ctx, dataToStore)
                     out("if (", mangled, " === undefined) { throw new Error('local variable \\\'", mangled, "\\\' referenced before assignment'); }\n");
                     return mangled;
                 case Store:
+                    this.changedVars.push(mangled);
                     out(mangled, "=", dataToStore, ";");
                     break;
                 case Del:
@@ -1705,6 +1756,7 @@ Compiler.prototype.nameop = function(name, ctx, dataToStore)
                     out("var ", v, "=", mangled, "!==undefined?",mangled,":Sk.misceval.loadname('",mangledNoPre,"',$gbl);");
                     return v;
                 case Store:
+                    this.changedVars.push(mangled);
                     out(mangled, "=", dataToStore, ";");
                     break;
                 case Del:

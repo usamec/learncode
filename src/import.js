@@ -260,7 +260,28 @@ Sk.importStar = function(module,loc) {
     }
 }
 
+Sk.copyLoc = function(loc) {
+  var ret = {}
+  for (var prop in loc) {
+    if (!loc[prop]) continue;
+    if (loc[prop].tp$name === undefined) {
+      continue;
+    }
+    var prop2 = prop.replace("$loc$", "");
+    if (loc[prop].tp$name == 'number') {
+      ret[prop2] = {skType:loc[prop].skType, v:loc[prop].v}
+    }
+    if (loc[prop].tp$name == 'bool') {
+      var v2 = "False";
+      if (loc[prop].v) v2 = "True";
+      ret[prop2] = {skType:'boolean', v:v2}
+    }
+  }
+  return ret;
+}
+
 goog.exportSymbol("Sk.importMain", Sk.importMain);
 goog.exportSymbol("Sk.importMainWithBody", Sk.importMainWithBody);
 goog.exportSymbol("Sk.builtin.__import__", Sk.builtin.__import__);
 goog.exportSymbol("Sk.importStar", Sk.importStar);
+goog.exportSymbol("Sk.copyLoc", Sk.copyLoc);
