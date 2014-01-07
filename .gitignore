@@ -1,9 +1,9 @@
 support/tmp/
-doc/static/skulpt-stdlib.js
-doc/static/skulpt.min.js
-doc/static/dist/*
+frontend/doc/static/skulpt-stdlib.js
+frontend/doc/static/skulpt.min.js
+frontend/doc/static/dist/*
 vendor/
-dist/*
+frontend/dist/*
 
 *.pyc
 .DS_Store
